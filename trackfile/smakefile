@@ -1,0 +1,112 @@
+#
+# :ts=8
+#
+# A trackdisk.device which uses ADF disk image files and its
+# sidekick, the trusty DAControl shell command.
+#
+# Copyright (C) 2020 by Olaf Barthel <obarthel at gmx dot net>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+#
+
+.asm.o:
+	asm $(AFLAGS) $<
+
+.c.o:
+	sc $(CFLAGS) $<
+
+###############################################################################
+
+NAME = trackfile.device
+
+###############################################################################
+
+OPTIMIZE =	optimize opttime
+CPU =		any
+DEBUG =		line
+#DEBUG =	symbolflush noopt
+
+###############################################################################
+
+CFLAGS =	resopt idlen=64 comnest streq strmerge nostkchk \
+		$(OPTIMIZE) cpu=$(CPU) debug=$(DEBUG) \
+		params=register strsect=code mccons smallcode data=faronly \
+		gst=system_headers.gst
+AFLAGS =	-d
+LFLAGS =	addsym smallcode noicons batch
+
+###############################################################################
+
+OBJS = \
+	trackfile_device.o cache.o commands.o functions.o \
+	mfm_encoding.o swap_stack.o tools.o unit.o
+
+###############################################################################
+
+LIBS = lib:scnb.lib lib:amiga.lib lib:debug.lib
+
+###############################################################################
+
+$(NAME): system_headers.gst assert.lib $(OBJS)
+	slink $(OBJS) to $@.debug lib $(LIBS) assert.lib $(LFLAGS) \
+		map $@.map,fhx fwidth 32 pwidth 32 swidth 32
+	slink $@.debug to $@ noicons nodebug
+
+###############################################################################
+
+system_headers.gst : system_headers.c system_headers.h compiler.h
+	gst unload $@
+	sc $(CFLAGS) nogst noobjname makegst=$@ system_headers.c
+	gst $@
+
+###############################################################################
+
+assert.lib : assert.o
+	oml assert.lib r assert.o
+
+###############################################################################
+
+assert.o : assert.c compiler.h
+cache.o : cache.c compiler.h system_headers.h tools.h mfm_encoding.h unit.h \
+	cache.h trackfile_device.h swap_stack.h assert.h
+commands.o : commands.c compiler.h system_headers.h tools.h mfm_encoding.h \
+	unit.h cache.h trackfile_device.h assert.h commands.h
+functions.o : functions.c compiler.h system_headers.h tools.h mfm_encoding.h \
+	unit.h cache.h trackfile_device.h assert.h functions.h
+mfm_encode_decode.o : mfm_encode_decode.c
+mfm_encoding.o : mfm_encoding.c compiler.h system_headers.h tools.h \
+	mfm_encoding.h unit.h cache.h trackfile_device.h assert.h
+raw_disk.o : raw_disk.c
+system_headers.o : system_headers.c compiler.h system_headers.h
+tools.o : tools.c compiler.h system_headers.h tools.h mfm_encoding.h unit.h \
+	cache.h trackfile_device.h assert.h
+trackfile_device.o : trackfile_device.c compiler.h system_headers.h tools.h \
+	mfm_encoding.h unit.h cache.h trackfile_device.h assert.h \
+	trackfile.device_rev.h commands.h functions.h
+unit.o : unit.c compiler.h system_headers.h tools.h mfm_encoding.h unit.h \
+	cache.h trackfile_device.h assert.h commands.h
+swap_stack.o : swap_stack.asm
+
+###############################################################################
+
+clean:
+	-delete \#?.(o|lib) \#?/\#?.(o|lib) $(NAME)(%|.debug)
+
+realclean: clean
+	-delete tags tagfiles \#?.map system_headers.gst all

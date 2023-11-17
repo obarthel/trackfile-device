@@ -1,0 +1,955 @@
+----------------------- AmigaOS 3.2 project --------------------------
+
+trackfile.device 1.18 (25.4.2020)
+
+- First regular AmigaOS 3.2 build for trackfile.device
+
+trackfile.device 1.19 (27.4.2020)
+
+- For CMD_READ, CMD_WRITE and TD_FORMAT the io_Data address must
+  be WORD-aligned (16 bit word). This is what the documentation
+  for trackdisk.device requires and stresses, too.
+
+- TD_REMCHANGEINT must use the same IOStdReq which was previously
+  used with TD_ADDCHANGEINT. This is what the documentation
+  for trackdisk.device requires and stresses, too.
+
+trackfile.device 1.20 (27.4.2020)
+
+- Added the first bunch of AutoDoc comments.
+
+- Added the standard, but previously absent, parameter validation
+  for the TD_ADDCHANGEINT and TD_REMCHANGEINT commands.
+
+- TD_FORMAT now follows the specifications by requiring that only
+  full tracks may be written to. This is one of the points at which
+  TD_FORMAT deviates from CMD_WRITE.
+
+- TD_REMOVE now checks if the IORequest is really an IOStdRequest
+  but refrains from reporting an error if this is not so. The legacy
+  code which would use TD_REMOVE did not perform any error checking
+  anyway :-(
+
+trackfile.device 1.21 (29.4.2020)
+
+- Broke up "trackfile_device.c" into "commands.c", "functions.c",
+  "tools.c" and "unit.c" to be more manageable.
+
+trackfile.device 1.22 (29.4.2020)
+
+- Made most of the functions in "commands.c" local to that file.
+
+- Turns out that the TD_REMOVE command was not even hooked up.
+  That might explain a lot...
+
+- Moved from one single "protos.h" file to individual files with
+  function prototype definitions for the respective module.
+
+- Disabled the debug build option in "assert.h" which I had
+  checked in by mistake...
+
+trackfile.device 1.23 (30.4.2020)
+
+- TD_REMOVE and TD_GETGEOMETRY are now immediate commands and
+  do not involve the unit process.
+
+- Updated the device command documentation to reflect which
+  commands are immediate commands (they observe the IOF_QUICK
+  flag) and which ones are not (they do not observe the
+  IOF_QUICK flag and are always handled by the unit process).
+
+- Added a ton of assertions which will hopefully never ever
+  produce any output.
+
+- The test for an overflowing unit number in TFStartUnitTagList()
+  did not work as it should. Fixed.
+
+- TFInsertMediaTagList() now returns an error if checking the
+  volume on which the file to be used resides does not work out.
+
+- The timeout option for TFEjectMediaTagList() now has the
+  effect of polling the "can we proceed with ejecting the medium"
+  status twice per second for better responsiveness. Also, the
+  timeout is now observed correctly.
+
+- If TFGetUnitData() cannot fill in the unit data it prepared,
+  such as can happen in a multitasking environment, it now marks
+  the respective unit record both as having size=0 and a drive
+  type of -1. DAControl so far checked only the size information,
+  but that used to be non-zero up until now :-(
+
+- Moved the I/O requester message type initialization right to
+  the beginning of the dev_open() function where it belongs.
+  Previously, it was initialized only if opening the device
+  and unit was both successful, which was not as robust as this
+  should have been. The initialization must be performed at
+  all times, or otherwise the client might accidentally
+  call WaitIO() and hang.
+
+trackfile.device 1.24 (1.5.2020)
+
+- Replaced the DeviceNode startup field wrangling with one single
+  function responsible for the whole affair.
+
+trackfile.device 1.25 (10.5.2020)
+
+- Replaced duplicate code with individual functions which
+  perform the same services as the duplicates.
+
+- TD_SEEK did not verify that a valid IOStdReq had been
+  passed as the parameter.
+
+- Moved the "medium present" and "medium is write protected"
+  checks in front of all the I/O request tests in those command
+  functions for which this made sense.
+
+trackfile.device 1.26 (10.5.2020)
+
+- Refactoring can be hazardous for your code if you name scratch
+  variables like those you actually wanted to retain their
+  values until after a loop has run its course.
+
+trackfile.device 1.27 (11.5.2020)
+
+- Added support for the ETD_CLEAR, ETD_FORMAT, ETD_MOTOR, ETD_READ,
+  ETD_SEEK, ETD_UPDATE and ETD_WRITE commands in the hope that this
+  will be useful somehow. Note that for ETD_READ with a buffer for
+  the sector label information supplied trackfile.device will
+  pretend that only zeroes could be read.
+
+- Removed the unused and nonsensical TD_RAWWRITE command
+  handling which dropped into the regular CMD_WRITE handling.
+
+- Simplified the CMD_UPDATE handling.
+
+trackfile.device 1.28 (11.5.2020)
+
+- Added support for the CMD_STOP and CMD_START commands. Just
+  like trackdisk.device uses them...
+
+- Restricted the immediate commands to CMD_START, TD_CHANGENUM,
+  TD_CHANGESTATE, TD_GETDRIVETYPE, TD_GETNUMTRACKS and TD_REMCHANGEINT
+  so that the behaviour follows trackdisk.device exactly.
+
+- Updated the code documentation.
+
+trackfile.device 1.29 (12.5.2020)
+
+- Replaced the unit structure with the documented trackdisk.device
+  public unit structure. Track numbers (0..159) are updated in
+  real time as needed and the change counter value is updated
+  as well. Some of the unit flags are updated, as well as the
+  unit usage counter.
+
+  If the motor is turned off, the track number reported in the
+  public unit structure is always set to -1.
+
+  Existing tools which monitored the track information, e.g. for
+  display purposes could be adapted to use trackfile.device as well.
+
+- When starting up a new unit TFStartUnitTagList() now waits for
+  the unit to initialize. Since it has to open timer.device now,
+  that step makes sure that the unit is ready by the time a file
+  system needs to open it.
+
+- The unit process now denies any attempt to eject a disk image
+  file medium if the motor is currently running, the track buffer
+  has been modified and not yet written back to the file, or both
+  conditions are met.
+
+- TFGetUnitData() now marks a unit as busy only if the motor
+  is currently on.
+
+- Closing a unit with the motor still on or the track buffer contents
+  having been modified now causes the buffer to be written back and
+  the motor to be turned off again if there is no further disk
+  activity within the next 2.5 seconds.
+
+trackfile.device 1.30 (14.5.2020)
+
+- Closing the device could cause an Enforcer hit if the control
+  unit (as used by the DAControl command) was being used. Fixed.
+
+trackfile.device 1.31 (16.5.2020)
+
+- Moved code which marks the track buffer contents as invalid,
+  as well as the code which marks the motor as turned off into
+  its own set of functions. These functions need to update more
+  than just a single variable. It's a bit safer to have
+  that done in one place only than to repeat the same code and
+  forget something.
+
+- If Read() fails then the track buffer contents will now always
+  get marked as being invalid.
+
+- TD_EJECT now also calls ACTION_FLUSH on the file system on
+  which the file resides, just in case.
+
+- If starting the unit Process fails, but the Process itself
+  fails to initialize correctly, this is now handled safely
+  and the unit data structures are removed and freed as well.
+
+- If the unit Process is asked to eject a medium, it will now
+  write back the track buffer to the file on its own accord
+  rather than refusing to eject the medium if the track buffer
+  still has changes pending. The eject operation now also
+  calls ACTION_FLUSH on the file system on which the file
+  resides.
+
+trackfile.device 1.32 (16.5.2020)
+
+- A read/write/format operation now always turns on the motor,
+  regardless of whether io_Length is > 0. If the operation
+  passes the parameter validation, then the motor will be
+  enabled.
+
+- Moved the disk image file eject operation (closes the file,
+  flushes the buffers, triggers change notification, etc.)
+  into its own distinct function.
+
+- Read operations now check if an actual error was returned
+  or if fewer data was read than requested. In the latter case
+  this will now set a trackdisk.device error in order to make
+  it somewhat clear that there was trouble. Also, regardless of
+  what may have gone wrong, the track buffer's contents are
+  invalidated.
+
+trackfile.device 1.33 (23.5.2020)
+
+- Added proper arbitration to state information shared between
+  the individual units, such as whether the disk image file is
+  currently open, device commands and library functions.
+  Previously, access was a more cavalier with read access and
+  locking was reserved to write access.
+
+- Moved the unit-specific data structures and constant from
+  the "trackfile_device.h" into "unit.h".
+
+- Replaced duplicate code by shared functions which do the
+  same work but only in a single place.
+
+trackfile.device 2.1 (30.5.2020)
+
+- Preparations for API additions, which aren't fully baked yet,
+  though... This accounts for the version bump.
+
+- With a writable medium the track buffer now covered by a
+  checksum to verify if its contents have indeed changed if
+  it was written to. Future feature: optionally take a checksum
+  of all the tracks of a medium before it gets mounted, to
+  detect media with the same contents in spite of being
+  stored in different files. This would help to avoid
+  crashing the file system...
+
+- Refactored a bit of common code used by file read error
+  processing.
+
+- The device structure now "mimics" the V33 trackdisk.device
+  as far as this can make sense. It seems that some client software
+  is not beyond peeking the internal device data, and trackfile.device
+  now halfway convincingly stores zero data in this area.
+
+trackfile.device 2.2 (30.5.2020)
+
+- Ouch! Destructive typo in the Fletcher-64 checksum calculation,
+  now fixed. Also unrolled that loop a bit.
+
+trackfile.device 2.3 (31.5.2020)
+
+- Added optional support for maintaining track and disk checksums,
+  so as to avoid mounting two disk image files with identical
+  contents. Such disk images are an issue for the AmigaDOS default
+  file system which tends to crash if it cannot tell two volumes
+  apart.
+
+  The track checksums are updated as data gets written
+  to the disk image, and the disk checksum is derived from all
+  the track checksums. The disk checksum is only recalculated
+  when it becomes necessary, e.g. when a new disk image is to be
+  used or when the unit information is retrieved.
+
+  Because the track an disk checksums need to be calculated
+  when the disk image file is inserted, the startup time may
+  be impacted, but I do not know yet if this is a noticeable
+  problem. Time to find out...
+
+trackfile.device 2.4 (1.6.2020)
+
+- Track boundary checking was too error prone. Reviewed all
+  the tests and introduced a device unit variable which
+  holds the total number of tracks instead of multiplying
+  the number of heads and cylinders every time the same
+  number is needed.
+
+- Added further diagnostic output for checksum calculation
+  and verification.
+
+- Updated the Fletcher-64 checksum code after reviewing what
+  little documentation there is on it. The Fletcher-16 and
+  Fletcher-32 checksums seem to be much more popular than
+  the Fletcher-64 variant.
+
+- Duplicate image detection should have skipped comparing
+  the unit file data with itself. Now it actually does ;-)
+
+trackfile.device 2.5 (1.6.2020)
+
+- Realized that the checksum calculation result does not
+  need to be inverted unless it's use to calculate/verify
+  a block checksum, such as is done for creating the
+  checksum of a boot block.
+
+trackfile.device 2.6 (6.6.2020)
+
+- Added scaffolding for the TD_RAWREAD and ETD_RAWREAD commmands.
+  The relevant code is enabled through a compile-time option.
+  We don't want to ship this feature enabled by accident,
+  especially since it's going to require a lot of code to make
+  it work well.
+
+- Removed the last surprising remnants of the TD_RAWWRITE command,
+  which must have slipped in by virtue (or lack thereof) of
+  copy & paste programming :-(
+
+trackfile.device 2.7 (6.6.2020)
+
+- Added the actual MFM encoding code for required for the
+  TD_RAWREAD and ETD_RAWREAD commmands to work. Building these
+  and more is optional and is controlled through the
+  '#define ENABLE_MFM_ENCODING' line in "mfm_encoding.h".
+
+trackfile.device 2.8 (6.6.2020)
+
+- Plugged the MFM encoding code into the TD_RAWREAD command
+  implementation.
+
+- Added code to simulate the effects of the IOTDF_INDEXSYNC and
+  IOTDF_WORDSYNC flags, the combination of both and the lack
+  of both. The contents of the track buffer may be rotated, the
+  first bit in the read buffer may belong to a random sector,
+  or even to a random bit of a random sector. Not sure if
+  all of this works yet, but if Disk Doctor can handle it...
+
+trackfile.device 2.9 (7.6.2020)
+
+- Added more debug output.
+
+- Updated the code documentation.
+
+- TFInsertMediaTagList() can make use of a ready-made file handle.
+  Prior to setting up the disk and track checksum information
+  we now seek to the beginning of the disk image file since it's
+  not a given that the file handle read position will already
+  be set to that position.
+
+- The MFM encoding buffer is now allocated via AllocVec() and
+  is released through FreeVec().
+
+- Changed the seed value for the PRNG which the TD_RAWREAD command
+  may make use of.
+
+- Found another TD_RAWWRITE remnant and removed it.
+
+trackfile.device 2.10 (7.6.2020)
+
+- The initial disk image checksum calculation could have work better.
+  Now it does...
+
+- Remembered that the "asyncio.c" code aligned the buffer for use
+  with file I/O to an MC68040 cache line address boundary to avoid
+  flushing more cache data than necessary during DMA. Also, the memory
+  buffer preferences of the file system which the disk image file
+  would reside on were never taken into account. Now we've got a
+  new set of functions which take care of both these aspects.
+
+trackfile.device 2.11 (11.6.2020)
+
+- Updated the code documentation and debug output.
+
+- Formatting a track now writes back the track buffer contents, if
+  necessary, since it's not a given that formatting a track will
+  be followed by formatting all the tracks. So we need to preserve
+  what's been modified just to be safe.
+
+- If CMD_WRITE will overwrite the contents of a full track, we no
+  longer bother to read the contents of that track into the
+  buffer.
+
+- The unit Processes are now running at Task priority level 5,
+  just like the trackdisk.device unit Tasks do.
+
+- Scanning the AmigaDOS device list now follows a single consistent
+  scheme which matches existing best practices.
+
+- Changed TFGetUnitData() to use LockDosList() instead of trying
+  to make do with AttemptLockDosList().
+
+trackfile.device 2.12 (11.6.2020)
+
+- Added TFExamineFileSize() function which DAControl can make
+  use of. No sense in duplicating this test in both the device
+  and the control command, should we support 5.25" disk image
+  files in the future, for example.
+
+trackfile.device 2.13 (13.6.2020)
+
+- Lucky number 13!
+
+- Finally, the TD_RAWREAD/ETD_RAWREAD commands are working as intended
+  for the purpose of testing within a debug build. What shall we do
+  with all this useless beauty?
+
+trackfile.device 2.14 (14.6.2020)
+
+- Updated the code documentation again.
+
+- The TD_RAWREAD code did not take the size of the sector
+  gap into account, which is twice the size of the double
+  density disk for a high density disk.
+
+- Changed the logic for handling index and word sync (and
+  the combination of both) again to be more consistent with
+  what trackdisk.device would probably do.
+
+trackfile.device 2.15 (14.6.2020)
+
+- Added HD_SCSICMD to the list of commands which could be unreasonably
+  expected to see use with this device. When it comes and the debug
+  mode is enabled we can now see it coming.
+
+- Fleshed out TFChangeMediaTagList() so that you can now request that
+  the write-protection of the medium may be changed without ejecting
+  the medium first.
+
+- Updated the unit process capabilities to handle the write protection
+  change. Note that if you want to disable the write protection, the
+  state of the volume on which the disk image file is found will be
+  checked first and then whether or not the disk image file is write
+  protected. If any of these conditions state that the file
+  cannot be changed, then this operation will fail.
+
+trackfile.device 2.16 (15.6.2020)
+
+- Surprisingly, TFChangeMediaTagList() works even better if the
+  correct tag item value is used when changing the write
+  protection of a unit.
+
+trackfile.device 2.17 (4.7.2020)
+
+- Small change for (hopefully) better scalability with lots of
+  disk units around. Each time a search for a unit is performed,
+  that unit data structure is now bumped to the head of the
+  unit list (if it's not already there). This will have the
+  effect of the most frequently-used units to bubble up to the
+  top of the list, making the access a snappier over time.
+
+trackfile.device 2.18 (9.7.2020)
+
+- Updated the disk checksum algorithm to include the file size
+  itself as the last 64 bit value processed. This should make the
+  algorithm yield a more robust checksum since it will now properly
+  discriminate between data which has been padded with zeroes and
+  data which is unpadded.
+
+- TFExamineFileSize() now returns TFEFS_Unsupported (which is -1)
+  if the size of an Amiga disk image file does not match any
+  known supported drive types.
+
+trackfile.device 2.19 (11.7.2020)
+
+- Padding the track checkums with the total size of the disk image
+  did not always add the correct file size, defeating the purpose
+  of the measure as a guard against mounting disks with identical
+  contents twice.
+
+trackfile.device 2.20 (16.7.2020)
+
+- Prepared scaffolding for checking the contents of the disk's
+  reserved and root directory blocks.
+
+- If the contents of an image file exactly match what a currently
+  active unit uses, the error code returned is no longer
+  ERROR_OBJECT_IN_USE but the more specific TFERROR_DuplicateDisk.
+
+- Added an additional layer of safety checks to avoid mounting a disk
+  with volume information which matches the volume node of an already
+  active file system. This is not yet enabled.
+
+- The write protection flag for TFC_ChangeWriteProtection doesn't have
+  to be exactly TRUE, it just has to be not FALSE. This could have
+  produced a nasty API bug.
+
+- Verified that the unit and device locking are still robust and do
+  not overlap to the point that deadlocks are possible.
+
+- Debug output in the unit process no longer has the side-effect of
+  indenting all debug messages for every new unit started.
+
+trackfile.device 2.21 (17.7.2020)
+
+- Fixed debug output indentation error caused by a missing RETURN()
+  macro in the TD_PROTSTATUS command handling.
+
+- Simplified the unit startup procedure to use message passing
+  rather than signals. It's better to keep this kind of stuff
+  simple. Also, the unit Process can now perform almost all its
+  initialization work by itself.
+
+- Enabled the code which obtains the file system signature, whether
+  or not the reserved blocks contain a valid boot block checksum,
+  the root directory name, the root directory creation date and
+  whether or not any of the previous two is valid. This information
+  is available through the unit information API and can be used
+  by DAControl (whic does not use it yet).
+
+- Made the code work which checks in advance whether or not the volume
+  name and creation date stored on a disk image matches an existing
+  volume node which is being actively used by a file system process
+  already. With this change in place, trackfile.device may be able to
+  stop file systems from crashing which use identical root directory
+  names and root directory creation dates.
+
+  This is either a clever solution, or beyond clever and really
+  stupid. Time to find out...
+
+trackfile.device 2.22 (18.7.2020)
+
+- Cleanup and integration work for the code which obtains boot block
+  and root block data.
+
+- Process creation was missing the "NP_ConsoleTask,NULL," tag item.
+  Previously, the console task information would have been inherited
+  from the caller. Not that this matters much, but it's one less
+  dangling pointer that could make mischief.
+
+- Verified that the volume name/creation date check indeed works for
+  the case of an unused volume node.
+
+trackfile.device 2.23 (19.7.2020)
+
+- Documented how the boot block checksum algorithm works and also
+  how it is used for testing a checksum. This must correspond to
+  how DAControl 2.21 does this, too.
+
+trackfile.device 2.24 (24.7.2020)
+
+- Stopping a unit and then restarting it again failed because
+  while the unit Process was inactive, the presence of the unused
+  specific unit data structure was considered an error, which it
+  is not. Fixed. Thanks go to Gerben van Kesteren for reporting
+  the problem and to Camilla Boemann for reminding me to get
+  it fixed.
+
+trackfile.device 2.25 (29.7.2020)
+
+- As a quirky workaround for FFS v40 and likely all previous versions
+  all checks to verify that the IOStdReq.io_Message.mn_Length field
+  has some meaning towards whether it's safe to use that request
+  are now skipped if a length of 0 is found. Without this workaround
+  FFS V40 would not even mount the disk because TD_CHANGESTATE, etc.
+  would fail.
+
+trackfile.device 2.26 (30.7.2020)
+
+- Added more diagnostic & debug output to track I/O request
+  processing.
+
+- API functions which do not work for a Task and which require
+  a Process (e.g. opening and closing files) now return either
+  an error code or NULL. Better than crashing...
+
+- Turns out that the BeginIO() function did not check if
+  an I/O request was actually requested to use quick I/O.
+  Every command that support quick I/O was processed as such.
+  Now this only happens if I/O requests specifically have the
+  IOF_QUICK flag set.
+
+- Added the same workaround for the TD_REMCHANGEINT command
+  which trackdisk.device uses. It's possible that the client
+  which used TD_ADDCHANGEINT will reuse the same I/O request
+  for TD_REMCHANGEINT. This must be treated as if IOF_QUICK
+  had been set or otherwise the internal list of I/O requests
+  which contain change interrupts would be corrupted.
+
+trackfile.device 2.27 (31.7.2020)
+
+- Added reporting of available stack size to all entry
+  points of trackfile.device. Looks good so far.
+
+- Simplified the code in all device commands which are callable
+  directly if the I/O request used has the IOF_QUICK flag set,
+  so that only the minimum required steps are taken. This
+  limits how much stack space is required to call these
+  functions.
+
+- Added more assertions and precondition/postcondition tests to
+  smoke out undefined behaviour, but so far things are looking
+  sane enough.
+
+- Fixed a design bug introduced by the trackdisk.device CMD_START
+  command which now, like the TD_REMCHANGEINT command, is always
+  executed on the context of the caller regardless of whether
+  the associated I/O request has the IOF_QUICK flag set or not.
+  This solves the problem of using CMD_START getting queued like
+  any other command if IOF_QUICK is not set, thus rendering it
+  useless... But then the original trackdisk.device CMD_STOP/CMD_START
+  code was undocumented anyway and likely nobody ever used it.
+
+- Simplified the unit I/O request cleanup code which now resorts
+  to sending all queued commands back with error code IOERR_ABORTED.
+
+trackfile.device 2.28 (4.8.2020)
+
+- The FFS does not use the ETD_READ, etc. commands, so the
+  check_extended_command() function won't ignore its
+  I/O request message length value being zero.
+
+- close_unit_file() now properly invalidates the track
+  buffer contents and also safely changes the file handle
+  to zero. This is an emergency shutdown after all.
+
+- Refactored the common file read code for all the
+  read/write/format commands. It also takes care of
+  writing the track buffer back to disk, if necessary.
+  This resulted in much shorter read/write/format
+  command implementations.
+
+- The few commands which support IOF_QUICK no longer
+  hold onto the unit lock. Instead they read from the
+  unit data. That unit data is only written to under
+  Forbid() conditions, making the read access safe.
+  This is also a precaution for making these read
+  accesses safe if the respective function had been
+  called from Disable() or supervisor state.
+
+- Added more arithmetic overflow checking in the
+  debug build.
+
+- Reworked how the track and disk checksums are calculated,
+  which now use a separate table which is not part of the
+  unit data structure allocated. The size of that table is
+  now stored explicitly in the unit data structure
+  and is always large enough for an 80 cylinder disk.
+
+- eject_image_file() is now safe to use even if the
+  unit file had been closed by close_unit_file() due
+  to an emergency. Also, close_unit_file() now sends
+  an ACTION_FLUSH packet to the file system only if
+  the file had ever been modified.
+
+- Added more code comments and debug output.
+
+- Updated the local AutoDocs to indicate precisely which
+  commands really support IOF_QUICK mode operations,
+  which is only a small subset.
+
+- Added a new stack size checking and reporting function
+  which will also report if the execution context is
+  not currently in user mode.
+
+trackfile.device 2.29 (4.8.2020)
+
+- The device open function does not actually need to use
+  the global signal semaphore.
+
+- The device begin I/O function does not need the global
+  signal semaphore either, Forbid() locking is fine, too.
+
+- send_unit_control_command() and find_unit_by_number()
+  do not need the global signal semaphore, Forbid()
+  locking is fine, too.
+
+- tf_start_unit_taglist() needs to use Forbid() locking
+  when adding a new unit to the global list, now that
+  find_unit_by_number() no longer uses the global
+  signal semaphore.
+
+trackfile.device 2.30 (4.8.2020)
+
+- tf_get_unit_data() no longer trashes memory if called from
+  a Task context.
+
+- The assert.c code no longer uses debug.lib and is no longer
+  compatible with GCC or OS4, for that matter.
+
+- Disabled all code optimizations in the build GNUmakefile.
+
+trackfile.device 2.31 (5.8.2020)
+
+- update_disk_checksum() can no longer be called accidentally
+  through tf_get_unit_data() if there are no track checksums
+  enabled for a unit. Previously, it could have trashed memory.
+  This seems to have been the only execute path through which
+  this memory trashing could have been triggered.
+
+- The medium insert/eject operations now trigger the medium
+  change notifications after they have replied the respective
+  control messages.
+
+- Changed the name of the local vsnprintf() and snprintf()
+  functions to make clang happy and not complain about the
+  function prototypes being different from the C99 versions.
+
+- Added unit address validation in AbortIO() and BeginO()
+  device functions.
+
+- Added more code documentation.
+
+- Debug output in read/write/format code now prints more detailed
+  information on the I/O request.
+
+trackfile.device 2.32 (6.8.2020)
+
+- If the file system of the ovlume on which disk image files reside
+  does not support AmigaDOS 2.x functions such as ExamineFH(),
+  DupLockFromFH(), ParentOfFH() or NameFromFH(), trackfile.device now
+  uses fallbacks if possible. This may have the effect of the full
+  path name of disk image files being unavailable, but is mostly
+  harmless. For example, trackfile.device may no longer be able to
+  conclude that a disk image file cannot be written to because it
+  cannot safely examine the volume on which that file is stored.
+
+trackfile.device 2.33 (7.8.2020)
+
+- If ExamineFH() does not work for a disk image file to learn its
+  file size, we now try Lock() and Examine() if at least the file
+  name is known. This should be faster and more scalable (for large
+  files) than the use of Seek(). Obtaining a lock on the disk image
+  file will also allow for the volume on which the file resides to be
+  checked for write protection.
+
+- Reviewed how the global device lock vs the Forbid()/Permit() locking
+  is used and made a few changes for more robustness. Turns out that
+  locking was used frequently under the assumption that a unit could
+  be removed, but in the current design this is not possible.
+  Accessing the unit list now always requires that the global device
+  lock is being held.
+
+trackfile.device 2.34 (8.8.2020)
+
+- Added more cache support code, including control tags which are
+  probably best placed in a new API. The code still needs hooking up
+  in DAControl or at least a test build for initial experiments ;-)
+
+- Just because it might actually make a difference on slow devices,
+  the trackfile units now remember the last file read/write position
+  and will skip the Seek() call if it has not changed.
+
+trackfile.device 2.35 (9.8.2020)
+
+- Added more diagnostic code for the seek optimizations.
+
+- Added references for the source of the splay tree code.
+
+- tf_get_unit_data() now supplies information about the state
+  of the cache for the unit, as in whether it is enabled,
+  how many accesses have taken place, and how many of these
+  were cache misses.
+
+- Trying to enable the disk cache for a unit is now denied
+  if the disk drive type is not currently supported. support
+  for high density 3.5" disks still needs to be worked out.
+
+- If the cache is enabled for a unit, reading from the disk image
+  fill will now actively fill it or update existing entries.
+  Likewise, successful write accesses will update existing
+  cache entries. However, successful write accesses will not
+  create new cache entries.
+
+- Failed write operations now invalidate the cache entry which
+  corresponds to the track which could not be written to.
+
+- Ejecting a disk image file now invalidates all the cache entries
+  of this specific unit. This code currently does not scale
+  particularly well at all :-/
+
+- Unfortunately, the caching imposes an artificial limit on the
+  number of units which can be in operation at the same time.
+  Available memory is no longer the limiting factor here, and only
+  up to 8,388,608 units may be used at a time now.
+
+trackfile.device 2.36 (9.8.2020)
+
+- Fixed the seek optimization which did not play well with the
+  caching...
+
+- The cache enable/prefill options did not get evaluated properly,
+  producing the odd side-effect of always getting enabled by
+  default. Fixed.
+
+- The test for an unusable cache size was put in the wrong way
+  round and thereby rendered the cache ineffective. Fixed.
+
+- The percentage figure calculated for the cache hit ratio was
+  too far off. Fixed.
+
+- The prefill option will be ignored if the size of the disk
+  image file is larger than what the device cache can hold.
+
+trackfile.device 2.37 (10.8.2020)
+
+- Changed the name of the TFChangeMediaTagList/TFChangeMediaTags
+  function to TFChangeUnitTagList/TFChangeUnitTags so that the
+  API changes which affect all units could find a more fitting
+  home here.
+
+- The just-renamed TFChangeUnitTagList function now supports
+  the TF_MaxCacheMemory tag, which will change the maximum
+  amount of cache memory which all units share. This setting
+  can only be changed for the control unit, though, not for
+  any individual units.
+
+- Added code to handle the "this should never happen" case of
+  duplicate keys in the cache.
+
+- Removed the empty_cache() cache function which might
+  make a comeback one of these days...
+
+- Changing the size of the shared cache no longer clears the
+  current cache first. If the new cache size results in fewer
+  cache entries to be active, then these will be removed and
+  freed first.
+
+- The seek optimization debugging code could have a Seek()
+  function calls left even if the code was not built for
+  debugging. Fixed.
+
+trackfile.device 2.38 (10.8.2020)
+
+- Updated the code documentation.
+
+- The update_cache_contents() function now tries to reuse
+  an unused cache node before it attempts to allocate memory
+  for a new node. Previously, a test to verify that adding
+  another node would not break the memory limit prevented
+  the unused node to be picked up. Fixed.
+
+trackfile.device 2.39 (11.8.2020)
+
+- Added code which should make the invalidation of all the cache
+  entries associated with a single unit more scalable. Instead of
+  checking all the probation and protection segment entries to find
+  out which entries need to go, the respective unit now keeps
+  track of all the cache nodes associated with.
+
+- The unit data structure is now passed along to the respective
+  cache functions which previously had to rely solely on the
+  unit and track numbers to read from or write to the cache (and
+  invalidate all the cache entries for a unit).
+
+- Added scaffolding for getting on the good side of the 'C'
+  compiler when using MinList/MinNode types with the exec.library
+  functions Insert(), AddHead(), AddTail(), Remove(), RemHead()
+  and RemTail() as well as the amiga.lib function NewList().
+  This scaffolding will have to go, eventually, but in the mean
+  time it's useful for switching List/Node types to MinList and
+  MinNode types, respectively, and have the compiler watch your
+  back for a change ;-)
+
+trackfile.device 2.40 (11.8.2020)
+
+- Switched List/Node types to MinList and MinNode types, respectively,
+  where this made good sense. This had the side-effect of rendering
+  the padding words in several data structures unnecessary.
+
+- Added fancy function prototypes for MinList/MinNode-specific
+  versions of Insert(), AddHead(), AddTail(), Remove(), RemHead(),
+  RemTail() and NewList() which helped to verify that the change to
+  MinList/MinNode was good enough. The scaffolding code for these has
+  been commented out now.
+
+trackfile.device 2.41 (12.8.2020)
+
+- TFChangeUnitTagList() can now change the size of the shared cache
+  (only for the control unit). Also, for each unit (with the exception
+  of the control unit) the cache can now be enabled and disabled;
+  disabling the cache will also invalidate all cache entries for this
+  unit.
+
+- Following the lead of how the Amiga default file system processes
+  what may be a root directory block, the checks applied to the
+  contents of the block now go beyond verifying the checksum and the
+  block type information.
+
+trackfile.device 2.42 (14.8.2020)
+
+- Forgot that the device expunge function must not call Wait(), and
+  that means ObtainSemaphore() is unsuitable. Now we're trying to
+  get by with AttemptSemaphore() instead.
+
+- tf_start_unit_taglist() will now configure the cache exactly once
+  and won't change the cache size when invoked again. This is how it
+  was always supposed to be like.
+
+trackfile.device 2.43 (14.8.2020)
+
+- The memory handler which may be called if memory is tight now
+  uses a separate stack to avoid trouble. As per the API documentation
+  the memory handler may be called with as little as 64 bytes of
+  stack available. The separate stack will have room for 2000 bytes
+  which is hopefully much more than is required for the memory
+  handler cleanup function to do its job.
+
+trackfile.device 2.44 (15.8.2020)
+
+- The cache feature is now enabled by default.
+
+- Simplified the code which adjusts the amount of memory which the
+  cache may use, removing duplicate/sufficiently similar
+  implementations of functions which performed the same tasks.
+
+- Removed non-essential data structures from the caching code.
+
+trackfile.device 2.45 (15.8.2020)
+
+- Stack swapping was set up incorrectly, yielding maximum trouble :-(
+  Fixed.
+
+- The maximum cache size is now broken down into actual cache entry
+  size chunks rather than just the size of the cache entry payload.
+  This means that each cache entry now counts for 32 + 5632 = 5664
+  bytes total.
+
+- The maximum cache size is now rounded up to a multiple of the
+  cache node size unless it's too small or 0.
+
+- Disabling a unit cache now also resets its cache access/miss
+  counters to 0.
+
+
+trackfile.device 2.46 (19.10.2020)
+
+- The unit Process no longer calls ReplyMsg() on an IOStdReq
+  which successfully uses TD_ADDCHANGEINT. This is necessary
+  because that IOStdReq will be stored in a unit-local list
+  until a corresponding TD_REMCHANGEINT using the very same
+  IOStdReq will remove it. Please note that this behaviour
+  is "normal", for trackdisk.device, at least.
+
+  Thanks go to Gerben van Kesteren for finding the conditions
+  under which the problem emerged!
+
+
+trackfile.device 2.47 (24.11.2022)
+
+- Better late than never: the CMD_WRITE command implementation
+  did not flush a modified track buffer back to the disk image
+  file before moving on to a different track. This had various
+  side effects, none of them nice or predictable.
+
+  Thanks go to Mikhail Malyshev for finding the problem!
+
+
+trackfile.device 2.48 (25.11.2022)
+
+- Added BCPL string length validation where it was still missing.
+
+- The checksum option did not safely access the disk checksum table if
+  there was currently no data in the track buffer. Fixed.
+
+- Overwriting a track with contents identical to what used to be in the
+  track buffer before the changes were made could end up not writing
+  the changes to the file. Fixed.
+
+- Reworked the CMD_WRITE and CMD_READ implementations to be more
+  consistent in their respective behaviour.
