@@ -1,4 +1,4 @@
-# trackfile.device and its buddy DAControl
+# trackfile.device and its DAControl buddy
 
 AmigaOS 3.2 introduced the trackfile.device and its control command
 named "DAControl" as the means to make installing the operating system
